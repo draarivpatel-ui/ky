@@ -480,6 +480,37 @@ for (const cancellation of ['rejects', 'never settles'] as const) {
 	});
 }
 
+test.serial('a retry after a timeout gets a fresh signal when the global Request is a subclass', async t => {
+	// `@hono/node-server` replaces the global `Request` with a subclass. The retry clone is made by the runtime's own class, and must still be recognized as a `Request` so Ky re-attaches the managed signal instead of keeping the aborted one.
+	const OriginalRequest = globalThis.Request;
+	globalThis.Request = class extends OriginalRequest {};
+	t.teardown(() => {
+		globalThis.Request = OriginalRequest;
+	});
+
+	let attempts = 0;
+	const result = await ky(fixture, {
+		timeout: 50,
+		retry: {limit: 1, retryOnTimeout: true, delay: () => 0},
+		async fetch(request) {
+			attempts++;
+			if (attempts > 1) {
+				t.false(request.signal.aborted);
+				return new Response('retry succeeded');
+			}
+
+			return new Promise((_resolve, reject) => {
+				request.signal.addEventListener('abort', () => {
+					reject(request.signal.reason as Error);
+				});
+			});
+		},
+	}).text();
+
+	t.is(result, 'retry succeeded');
+	t.is(attempts, 2);
+});
+
 test('a late response from a timed-out attempt does not cancel the active retry', async t => {
 	const firstFetch = Promise.withResolvers<Response>();
 	const cancellation = Promise.withResolvers<void>();

@@ -1,6 +1,7 @@
 import type {Options} from '../types/options.js';
 import {responseTypes, usualFormBoundarySize} from '../core/constants.js';
 import {ResponseSizeError} from '../errors/ResponseSizeError.js';
+import {isRequestInstance} from './is.js';
 
 const encoder = new TextEncoder();
 const responseSizeErrors = new WeakMap<ReadableStream, () => ResponseSizeError | undefined>();
@@ -222,7 +223,7 @@ export const streamRequest = (request: Request, onUploadProgress: Options['onUpl
 		|| request.body.locked
 		|| request.keepalive
 		|| request.mode === 'no-cors'
-		|| !(request instanceof globalThis.Request)
+		|| !isRequestInstance(request)
 	) {
 		return request;
 	}

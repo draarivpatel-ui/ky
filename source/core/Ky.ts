@@ -36,7 +36,7 @@ import delay from '../utils/delay.js';
 import {findUnknownOptions, hasSearchParameters} from '../utils/options.js';
 import isRawNetworkError from '../utils/is-network-error.js';
 import {
-	isError, isNonArrayObject, isNonNegativeNumber, isObject, isRequest, isResponse,
+	isError, isNonArrayObject, isNonNegativeNumber, isObject, isRequest, isRequestInstance, isResponse,
 } from '../utils/is.js';
 import {
 	isHTTPError, isNetworkError, isTimeoutError, isResponseSizeError, isForceRetryError,
@@ -457,7 +457,7 @@ export class Ky {
 	// eslint-disable-next-line complexity
 	constructor(input: Input, options: Options = {}) {
 		// Checked before the options are built, since building them reads `input.headers`.
-		if (typeof input !== 'string' && !(input instanceof URL || input instanceof globalThis.Request)) {
+		if (typeof input !== 'string' && !(input instanceof URL || isRequestInstance(input))) {
 			throw new TypeError('`input` must be a string, URL, or Request');
 		}
 
@@ -506,7 +506,7 @@ export class Ky {
 			throw new TypeError('The `maxResponseSize` option must be a non-negative safe integer or Infinity');
 		}
 
-		this.#requestInput = input instanceof globalThis.Request ? input : undefined;
+		this.#requestInput = isRequestInstance(input) ? input : undefined;
 
 		input = resolveInput(input, this.#options.prefix, this.#options.baseUrl);
 
@@ -534,7 +534,7 @@ export class Ky {
 		// To provide correct form boundary, Content-Type header should be deleted when creating Request from another Request with FormData/URLSearchParams body
 		// Only delete if user didn't explicitly provide a custom content-type
 		if (
-			input instanceof globalThis.Request
+			isRequestInstance(input)
 			&& ((supportsFormData && this.#options.body instanceof globalThis.FormData) || this.#options.body instanceof URLSearchParams)
 			&& !userProvidedContentType
 		) {
@@ -1340,7 +1340,7 @@ export class Ky {
 
 	// A replacement `Request` from a hook or `ky.retry({request})` carries its own signal, so re-attach Ky's managed signal to keep timeouts and user aborts working. Request-like objects are used as-is since the `Request` constructor cannot copy them, so they keep whatever signal they carry, even on a retry after a timeout.
 	#withManagedSignal(request: Request): Request {
-		if (!this.#options.signal || !(request instanceof globalThis.Request)) {
+		if (!this.#options.signal || !isRequestInstance(request)) {
 			return request;
 		}
 

@@ -15,6 +15,25 @@ const createRecordingFetch = () => {
 	return {fetch: fetch as unknown as typeof globalThis.fetch, requests, inits};
 };
 
+test.serial('a Request from the runtime class is accepted when the global is a subclass', async t => {
+	// `@hono/node-server` replaces the global `Request` with a subclass. A `clone()` is always made by the runtime's own class, so it fails `instanceof` the replacement.
+	const OriginalRequest = globalThis.Request;
+	globalThis.Request = class extends OriginalRequest {};
+	t.teardown(() => {
+		globalThis.Request = OriginalRequest;
+	});
+
+	const {fetch, requests} = createRecordingFetch();
+
+	const clone = new OriginalRequest('https://example.com').clone();
+	t.false(clone instanceof globalThis.Request);
+
+	await ky(clone, {fetch, retry: 0});
+
+	t.is(requests.length, 1);
+	t.is(requests[0]!.url, 'https://example.com/');
+});
+
 // The URL parser removes a tab or newline anywhere in the input, so `h\rttps:` is still the `https:` scheme and must be rejected like `h\tttps:`.
 test('baseUrl rejects a slashless HTTP URL with a carriage return inside the scheme', async t => {
 	const {fetch, requests} = createRecordingFetch();
